@@ -8,13 +8,13 @@ Application web pour calculer les horaires de passage de groupes sur un ou plusi
 - Groupes avec départ, vitesse ou allure, points de passage et transitions T1/T2.
 - Traces GPX facultatives, carte et curseur horaire dans les vues de restitution.
 - Exports de tableaux et chronologies en XLSX ou PNG.
-- Sauvegarde automatique et code facultatif pour protéger les modifications.
+- Deux accès par code : invité en lecture des restitutions, administrateur avec accès aux paramètres et aux modifications.
 
 ## Déployer sur Vercel
 
 1. Ajoute le projet à un dépôt Git, puis importe ce dépôt dans Vercel (ou lance `npx vercel` depuis ce dossier).
 2. Dans les réglages du projet Vercel, crée un magasin **Blob** avec l’accès **Private** et relie-le au projet. Vercel fournit alors les variables d’environnement nécessaires au SDK.
-3. Pour protéger les modifications, ajoute `EDIT_CODE` dans **Settings > Environment Variables**, puis redéploie. Sans cette variable, les visiteurs peuvent créer, modifier et supprimer les parcours.
+3. Dans **Settings > Environment Variables**, ajoute `ADMIN_CODE` et `GUEST_CODE` avec deux codes distincts, puis redéploie. L’administrateur peut régler et modifier les parcours ; l’invité ne voit que les restitutions. Les deux codes sont requis.
 
 Le site est servi depuis `public/`. Les fonctions API se trouvent dans `api/` et utilisent Vercel Blob privé. Les fichiers GPX envoyés sont limités à 3,5 Mo pour rester sous la limite de taille des requêtes Vercel.
 
@@ -27,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Pour utiliser Blob en local, lie le magasin au projet Vercel afin que la CLI récupère ses variables d’environnement, ou fournis les identifiants du magasin dans l’environnement local. Configure aussi `EDIT_CODE` si tu veux tester la protection des écritures.
+Pour utiliser Blob en local, lie le magasin au projet Vercel afin que la CLI récupère ses variables d’environnement. Configure `ADMIN_CODE` et `GUEST_CODE` dans l’environnement local. Le code saisi est conservé dans la session de l’onglet et peut être changé avec « Changer de compte ».
 
 ## Structure
 

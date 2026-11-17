@@ -93,6 +93,7 @@ tr.pt{cursor:pointer}tr.pt:hover td{background:var(--bg)}tr.pt.sel td{background
   <input id="rname" aria-label="Nom du parcours">
   <button id="newbtn">Nouveau parcours</button>
   <button class="ghost" id="delbtn">Supprimer ce parcours</button>
+  <button class="ghost" id="logoutbtn" hidden>Changer de compte</button>
 </div>
 <nav id="tabs" aria-label="Sections"></nav>
 <main>
@@ -126,7 +127,7 @@ const SK=["nat","velo","cap"];
 const SP={velo:{n:"Vélo",rn:"Restitution vélo",c:1},nat:{n:"Natation",rn:"Restitution natation",c:2},cap:{n:"Course à pied",rn:"Restitution course",c:0}};
 const TABS=[["nat","Natation"],["nat-r","Restitution natation"],["velo","Vélo"],["velo-r","Restitution vélo"],["cap","Course à pied"],["cap-r","Restitution course"],["global","Restitution globale"]];
 const ALIAS={points:"velo",velos:"velo",gpx:"velo",restitution:"velo-r"};
-let routes=[],cur=null,tab="global",sel={},T={},timer=null,dirty=false;
+let routes=[],cur=null,tab="global",sel={},T={},timer=null,dirty=false,userRole=null;
 const S=k=>cur.sports[k];
 /* Allures : vélo en km/h ; natation en secondes/100 m ; course en secondes/km (distances stockées en km) */
 const fpace=s=>{s=Math.round(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
@@ -141,13 +142,22 @@ const sortedPts=k=>S(k).points.slice().sort((a,b)=>a.km-b.km);
 
 /* ---------- API ---------- */
 async function api(method,path,body,retry=true){
-  const h={"content-type":"application/json"};let c="";try{c=localStorage.getItem("edit-code")||""}catch(e){}
-  if(c)h["x-edit-code"]=c;
+  const h={"content-type":"application/json"};let c="";try{c=sessionStorage.getItem("access-code")||localStorage.getItem("edit-code")||""}catch(e){}
+  if(c)h["x-access-code"]=c;
   const r=await fetch("/api"+path,{method,headers:h,body:body?JSON.stringify(body):undefined});
-  if(r.status===401&&retry){const n=prompt("Code de modification :");if(n){try{localStorage.setItem("edit-code",n)}catch(e){}return api(method,path,body,false)}}
+  if(r.status===401&&retry){const n=prompt("Code d’accès invité ou administrateur :");if(n){try{sessionStorage.setItem("access-code",n)}catch(e){}return api(method,path,body,false)}}
+  const role=r.headers.get("x-user-role");if(role==="admin"||role==="guest"){userRole=role;applyRole()}
   if(!r.ok){let message="";try{message=(await r.json()).error||""}catch(e){}throw new Error(message||`Erreur HTTP ${r.status}`)}
   return r.json();
 }
+function applyRole(){
+  const guest=userRole==="guest";
+  document.body.classList.toggle("guest",guest);
+  $("#newbtn").hidden=guest;$("#delbtn").hidden=guest;$("#rname").hidden=guest;$("#logoutbtn").hidden=!userRole;
+  $$("#tabs a").forEach(a=>{const k=a.dataset.tab;a.textContent=guest&&k!=="global"?"Restitution "+({nat:"natation",velo:"vélo",cap:"course à pied"}[k]):({nat:"Natation",velo:"Vélo",cap:"Course à pied",global:"Restitution globale"}[k])});
+  $$(".seg a[data-sub='p']").forEach(a=>a.hidden=guest);
+}
+$("#logoutbtn").onclick=()=>{try{sessionStorage.removeItem("access-code");localStorage.removeItem("edit-code")}catch(e){}location.reload()};
 function status(s,t){const e=$("#status");e.className=s;e.textContent=t}
 function touch(){dirty=true;status("","Enregistrement…");clearTimeout(timer);timer=setTimeout(flush,700)}
 async function flush(){
@@ -430,6 +440,9 @@ async function show(){
   if(dirty)await flush();
   let [id,t]=location.hash.slice(1).split("/");
   try{await loadList()}catch(e){status("err",location.protocol==="file:"?"Page ouverte en local : lance l’application avec Vercel (`npm run dev`) ou déploie-la sur Vercel pour connecter l’API et le stockage.":e.message||"Impossible de joindre l’API. Vérifie le déploiement et la configuration du stockage Vercel Blob.");return}
+  if(userRole==="guest"&&SK.includes(t))t+="-r";
+  if(userRole==="guest"&&!routes.length){cur=null;fillSelect();$("#global").innerHTML="<h2>Restitution globale</h2><p class=\"hint\">Aucun parcours n’est disponible.</p>";return view("global")}
+  if(userRole==="guest"&&id==="nouveau"){id=routes[0].id;t="global"}
   if(id==="nouveau"||!routes.length){cur=null;fillSelect();return view("nouveau")}
   if(!routes.some(r=>r.id===id))id=routes[0].id;
   if(!cur||cur.id!==id){
@@ -442,13 +455,14 @@ async function show(){
   view(tab);
 }
 function view(name){
+  if(userRole==="guest"&&SK.includes(name))name+="-r";
   const has=!!cur&&name!=="nouveau",ids=cur?cur.id:"",sub=name.endsWith("-r");
   $$("main section").forEach(s=>s.hidden=s.id!==name);
-  $("#tabs").hidden=!has;$("#rname").hidden=!has;$("#delbtn").hidden=!has;$("#rsel").hidden=!routes.length;$("label[for=rsel]").hidden=!routes.length;
+  $("#tabs").hidden=!has;$("#rname").hidden=!has||userRole==="guest";$("#delbtn").hidden=!has||userRole==="guest";$("#newbtn").hidden=userRole==="guest";$("#logoutbtn").hidden=!userRole;$("#rsel").hidden=!routes.length;$("label[for=rsel]").hidden=!routes.length;
   $("#hname").textContent=cur?cur.name||"Horaires de passage":"Horaires de passage";
   $("#facts").hidden=!has;
   if(has)$("#facts").innerHTML=SK.map(k=>`<div class="fact ${k}">${SP[k].n}<b>${fd(k,S(k).km)}</b></div>`).join("");
-  $$("#tabs a").forEach(a=>{const k=a.dataset.tab;a.href="#"+ids+"/"+(k!=="global"&&sub?k+"-r":k);if(name===k||name===k+"-r")a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+  $$("#tabs a").forEach(a=>{const k=a.dataset.tab;a.href="#"+ids+"/"+(userRole==="guest"&&k!=="global"?k+"-r":k!=="global"&&sub?k+"-r":k);if(name===k||name===k+"-r")a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
   $$(".seg[data-seg]").forEach(sg=>{const k=sg.dataset.seg;[["p",k],["r",k+"-r"]].forEach(([s,t])=>{const a=sg.querySelector(`[data-sub=${s}]`);a.href="#"+ids+"/"+t;if(name===t)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})});
   if(!has)return;
   if(SK.includes(name))renderParam(name);else if(name==="global")renderGlobal();else renderRes(name.replace(/-r$/,""));
