@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Horaires de passage – natation, vélo, course à pied</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EAF1F6;--surface:#fff;--ink:#0B2545;--muted:#52667A;--line:#D2DDE6;--navy:#0B2545;--acc:#13396B;--acc-ink:#fff;
+--nat:#1E6FD9;--velo:#1F8A4C;--cap:#D6362F;--on:#fff;--sel:#FFF4CC;--err:#B3261E;--ok:#2E7D32;
+--b0:#E08A00;--b1:#8E44AD;--b2:#00938F;--b3:#C2185B;--b4:#6D4C41;--b5:#546E7A}
+@media (prefers-color-scheme:dark){:root{--bg:#0A1622;--surface:#12253A;--ink:#E8F0F7;--muted:#9AB0C4;--line:#243B54;--acc:#5BA3FF;--acc-ink:#06121D;
+--nat:#5BA3FF;--velo:#55C888;--cap:#FF6B63;--on:#06121D;--sel:#3A3414;--err:#FF8A80;--ok:#6FCF76;
+--b0:#FFB74D;--b1:#C39BD3;--b2:#4DD0CB;--b3:#F48FB1;--b4:#BCAAA4;--b5:#90A4AE}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+.hero{position:relative;overflow:hidden;background:linear-gradient(180deg,#0B2545 0%,#13396B 100%);color:#fff;padding:26px clamp(16px,4vw,40px) 64px}
+.hero svg.t{position:absolute;right:clamp(8px,6vw,80px);bottom:0;height:88%;opacity:.95;pointer-events:none}
+.hero svg.w{position:absolute;left:0;right:0;bottom:-1px;width:100%;height:44px;pointer-events:none}
+.tag{display:inline-block;font:600 14px "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 12px}
+h1{font:800 clamp(34px,7vw,66px)/.98 "Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;margin:12px 0 8px;letter-spacing:.01em;max-width:15ch;position:relative}
+.hero p{margin:0;font-size:18px;max-width:38ch;opacity:.92;position:relative}
+#status{display:block;margin-top:10px;font-size:14px;color:#cfe0f0;position:relative;min-height:1.3em}#status.err{color:#ffb4a9}#status.ok{color:#a8e6b9}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 clamp(16px,4vw,40px);margin-top:-30px;position:relative;max-width:900px}
+.fact{border-radius:10px;padding:10px 14px;color:var(--on);font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.fact b{display:block;font:800 26px/1.05 "Barlow Condensed",sans-serif}
+.fact.nat{background:var(--nat)}.fact.velo{background:var(--velo)}.fact.cap{background:var(--cap)}
+.rbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:16px clamp(16px,4vw,40px) 0}
+.rbar label{color:var(--muted);font-weight:600}
+nav{display:flex;gap:6px;padding:14px clamp(16px,4vw,40px) 0;overflow-x:auto}
+nav a{font:700 17px "Barlow Condensed",sans-serif;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 16px;white-space:nowrap}
+nav a[aria-current="page"]{color:var(--on);border-color:transparent;background:var(--acc)}
+nav a[aria-current="page"][data-tab="nat"]{background:var(--nat)}nav a[aria-current="page"][data-tab="velo"]{background:var(--velo)}nav a[aria-current="page"][data-tab="cap"]{background:var(--cap)}
+nav a[aria-current="page"][data-tab="global"]{background:var(--navy);color:#fff}
+@media (prefers-color-scheme:dark){nav a[aria-current="page"][data-tab="global"]{background:var(--acc);color:var(--acc-ink)}}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+main{padding:20px clamp(16px,4vw,40px) 56px;max-width:1080px}
+h2{font:800 30px/1.1 "Barlow Condensed",sans-serif;text-transform:uppercase;margin:0 0 8px}
+h3{font:700 20px "Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.03em;margin:28px 0 8px}
+p.hint,.hint{color:var(--muted);margin:0 0 14px;max-width:70ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:14px}
+td.n,th.n{text-align:right}tr:last-child td{border-bottom:0}
+tr.tot td{font-weight:700;border-top:2px solid var(--ink);background:var(--bg)}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+input.name{width:100%;min-width:180px}input.num{width:90px;text-align:right}input[type=time]{width:110px}
+#rname{font-size:18px;font-weight:600;min-width:220px}
+button{font:inherit;font-weight:600;cursor:pointer;border-radius:6px;padding:8px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button.primary,a.btn{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+a.btn{display:inline-block;text-decoration:none;font-weight:600;border-radius:6px;padding:8px 14px}
+button.ghost{border-color:transparent;color:var(--muted);padding:6px 10px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:8px;overflow:hidden;margin:0 0 16px}
+.seg a,.seg button{font:600 16px inherit;font-family:inherit;border:0;border-radius:0;background:var(--surface);color:var(--ink);padding:8px 18px;cursor:pointer;text-decoration:none}
+.seg a[aria-current="page"],.seg button[aria-pressed="true"]{background:var(--acc);color:var(--acc-ink)}
+.grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}.facts{gap:6px}.fact b{font-size:22px}}
+.slider{padding:12px 16px 16px;border-top:1px solid var(--line)}.slider input{width:100%;padding:0;accent-color:var(--acc)}
+.clock{font:800 32px/1 "Barlow Condensed",sans-serif}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;color:var(--muted);font-size:15px}
+.panel{padding:16px}
+.big{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:18px}.big:last-child{border:0}
+tr.pt{cursor:pointer}tr.pt:hover td{background:var(--bg)}tr.pt.sel td{background:var(--sel)}
+.form{display:grid;gap:14px;max-width:460px;padding:18px}.form label{display:grid;gap:4px;font-weight:600}
+.msg{color:var(--err);min-height:1.4em}
+#map{height:clamp(340px,62vh,540px);background:var(--bg)}.leaflet-container{font:inherit}
+.exp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 6px;color:var(--muted);font-size:15px}
+.exp button{font-size:14px;padding:5px 12px}
+#gantt text{font:13px "Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;fill:var(--ink)}#gantt .ax{fill:var(--muted)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<header class="hero">
+  <span class="tag">Horaires de passage</span>
+  <h1 id="hname">Horaires de passage</h1>
+  <p>Natation, vélo et course à pied : l’heure de passage de chaque groupe, à chaque point.</p>
+  <span id="status" role="status" aria-live="polite"></span>
+  <svg class="t" viewBox="0 0 200 180" aria-hidden="true"><g fill="#E8F0F7" opacity=".16"><rect x="14" y="70" width="62" height="110"/><path d="M8 72 L45 20 L82 72 Z"/><rect x="108" y="96" width="78" height="84"/><path d="M102 98 L147 52 L192 98 Z"/></g><g fill="#fff" opacity=".5"><rect x="38" y="104" width="14" height="22" rx="7"/><rect x="132" y="124" width="14" height="20" rx="7"/></g></svg>
+  <svg class="w" viewBox="0 0 1200 44" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 Q100 4 200 24 T400 24 T600 24 T800 24 T1000 24 T1200 24 V44 H0Z" style="fill:var(--bg)"/></svg>
+</header>
+<div class="facts" id="facts" hidden></div>
+<div class="rbar" id="rbar">
+  <label for="rsel">Parcours</label>
+  <select id="rsel"></select>
+  <input id="rname" aria-label="Nom du parcours">
+  <button id="newbtn">Nouveau parcours</button>
+  <button class="ghost" id="delbtn">Supprimer ce parcours</button>
+</div>
+<nav id="tabs" aria-label="Sections"></nav>
+<main>
+<section id="nouveau" hidden>
+  <h2>Nouveau parcours</h2>
+  <p class="hint">Un parcours regroupe trois disciplines : natation, vélo et course à pied. Importe la trace GPX du parcours vélo (facultatif, les autres GPX se rajoutent ensuite dans chaque discipline).</p>
+  <div class="card form">
+    <label>Nom du parcours<input id="nname" placeholder="Ex. Triathlon L 2027"></label>
+    <label>Fichier GPX du vélo (facultatif)<input id="nfile" type="file" accept=".gpx,application/gpx+xml,text/xml"></label>
+    <div class="msg" id="nmsg" role="alert"></div>
+    <div class="bar" style="margin:0"><button class="primary" id="ncreate">Créer le parcours</button><button id="nexample">Charger l’exemple Format L 2027</button></div>
+  </div>
+</section>
+<div id="sections"></div>
+<section id="global" hidden></section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const EX_TRACK=[[46.156,-1.1573,0],[46.158,-1.1537,0.48],[46.1562,-1.1495,0.95],[46.1536,-1.1457,1.42],[46.1566,-1.1427,1.89],[46.1581,-1.1366,2.41],[46.1597,-1.1309,2.89],[46.1614,-1.1249,3.39],[46.1629,-1.1196,3.86],[46.1658,-1.112,4.52],[46.1675,-1.1072,5.02],[46.1688,-1.1018,5.47],[46.1672,-1.0926,6.21],[46.1686,-1.0804,7.24],[46.1704,-1.0742,7.77],[46.1744,-1.0672,8.47],[46.1765,-1.063,8.99],[46.1777,-1.0561,9.54],[46.179,-1.0506,9.99],[46.1776,-1.0454,10.46],[46.1755,-1.0392,11.0],[46.173,-1.0317,11.64],[46.171,-1.0248,12.22],[46.17,-1.0187,12.7],[46.1711,-1.0129,13.18],[46.1715,-1.0066,13.66],[46.1745,-1.0032,14.21],[46.1789,-1.0031,14.71],[46.1826,-1.0072,15.25],[46.1856,-1.0083,15.73],[46.1899,-1.0061,16.24],[46.1936,-1.0035,16.7],[46.1994,-0.9997,17.42],[46.2044,-0.9964,18.03],[46.2079,-0.9938,18.53],[46.2069,-0.9893,18.99],[46.2109,-0.9874,19.46],[46.2147,-0.9894,19.92],[46.2187,-0.992,20.49],[46.2228,-0.992,20.96],[46.2268,-0.9904,21.42],[46.2273,-0.9848,21.94],[46.2266,-0.9788,22.41],[46.2265,-0.9729,22.87],[46.2277,-0.9669,23.35],[46.2281,-0.9605,23.84],[46.2277,-0.9519,24.51],[46.2263,-0.9468,25.0],[46.2277,-0.9437,25.46],[46.2269,-0.9374,25.95],[46.2254,-0.932,26.41],[46.2234,-0.9269,26.91],[46.2227,-0.9208,27.38],[46.2217,-0.9146,27.88],[46.22,-0.9091,28.34],[46.2191,-0.9034,28.82],[46.218,-0.8962,29.39],[46.2164,-0.8907,29.85],[46.2136,-0.8887,30.33],[46.2095,-0.8903,30.82],[46.2054,-0.892,31.3],[46.2012,-0.8926,31.77],[46.1969,-0.894,32.26],[46.1922,-0.8935,32.78],[46.1879,-0.8935,33.26],[46.1853,-0.8904,33.73],[46.1816,-0.8868,34.24],[46.178,-0.8865,34.71],[46.1748,-0.8906,35.19],[46.1701,-0.8938,35.76],[46.1711,-0.8999,36.25],[46.1736,-0.9057,36.78],[46.1764,-0.912,37.36],[46.1786,-0.9171,37.82],[46.1783,-0.9229,38.3],[46.1785,-0.9294,38.81],[46.1785,-0.9364,39.35],[46.1782,-0.9433,39.88],[46.178,-0.9494,40.35],[46.1787,-0.9553,40.85],[46.177,-0.9636,41.56],[46.1761,-0.971,42.14],[46.1756,-0.9819,42.99],[46.1752,-0.9881,43.47],[46.1748,-0.9946,43.96],[46.1734,-1.0,44.42],[46.1724,-1.0037,44.89],[46.1766,-1.0033,45.36],[46.1805,-1.004,45.83],[46.1832,-1.0085,46.29],[46.187,-1.0074,46.81],[46.1912,-1.0052,47.32],[46.1951,-1.0026,47.8],[46.1994,-0.9997,48.34],[46.2044,-0.9964,48.95],[46.2079,-0.9938,49.44],[46.2065,-0.9891,49.89],[46.2105,-0.9875,50.37],[46.2147,-0.9894,50.86],[46.2187,-0.992,51.44],[46.2228,-0.992,51.9],[46.2268,-0.9904,52.37],[46.2273,-0.9848,52.89],[46.2266,-0.9788,53.35],[46.2265,-0.9729,53.81],[46.2277,-0.9669,54.3],[46.2281,-0.9605,54.79],[46.2277,-0.9519,55.46],[46.2263,-0.9468,55.95],[46.2277,-0.9437,56.41],[46.2269,-0.9374,56.9],[46.2254,-0.932,57.36],[46.2234,-0.9269,57.85],[46.2227,-0.9208,58.33],[46.2217,-0.9146,58.82],[46.22,-0.9091,59.29],[46.2191,-0.9034,59.77],[46.218,-0.8962,60.33],[46.2164,-0.8907,60.8],[46.2136,-0.8887,61.28],[46.2095,-0.8903,61.76],[46.2054,-0.892,62.24],[46.2012,-0.8926,62.71],[46.1969,-0.894,63.21],[46.1922,-0.8935,63.73],[46.1879,-0.8935,64.21],[46.1853,-0.8904,64.68],[46.1816,-0.8868,65.19],[46.178,-0.8865,65.66],[46.1748,-0.8906,66.13],[46.1701,-0.8938,66.71],[46.1711,-0.8999,67.2],[46.1736,-0.9057,67.72],[46.1764,-0.912,68.3],[46.1786,-0.9171,68.76],[46.1783,-0.9229,69.25],[46.1785,-0.9294,69.76],[46.1785,-0.9364,70.3],[46.1782,-0.9433,70.83],[46.178,-0.9494,71.3],[46.1787,-0.9553,71.79],[46.177,-0.9636,72.51],[46.1761,-0.971,73.09],[46.1756,-0.9819,73.93],[46.1752,-0.9881,74.41],[46.1748,-0.9946,74.91],[46.1734,-1.0,75.36],[46.1715,-1.0066,75.95],[46.1711,-1.0129,76.44],[46.17,-1.0187,76.91],[46.1709,-1.0246,77.38],[46.1728,-1.0313,77.94],[46.1747,-1.0372,78.44],[46.1768,-1.0438,78.99],[46.1793,-1.0487,79.46],[46.1782,-1.0546,79.97],[46.1769,-1.0606,80.45],[46.1752,-1.0653,80.91],[46.1719,-1.0717,81.54],[46.1692,-1.0765,82.01],[46.1675,-1.088,82.92],[46.1688,-1.1018,84.03],[46.1675,-1.1072,84.48],[46.1662,-1.1115,84.93],[46.1639,-1.1163,85.38],[46.1623,-1.1218,85.85],[46.1607,-1.1274,86.31],[46.159,-1.1334,86.82],[46.1574,-1.1393,87.31],[46.1557,-1.144,87.78],[46.155,-1.1483,88.24],[46.1582,-1.1518,88.72],[46.1574,-1.1569,89.19],[46.1559,-1.1573,89.37]];
+const EX_PTS=[["La Rochelle (départ)",0],["Périgny",5],["Dompierre-sur-Mer",8],["Montroy",12],["Sainte-Soulle (tour 1)",14],["Longèves (tour 1)",20],["Nuaillé-d’Aunis (tour 1)",25],["Saint-Sauveur-d’Aunis (tour 1)",30],["Anais (tour 1)",32],["Fontpatour (tour 1)",39],["Treuil-Arnaudeau (tour 1)",43],["Sainte-Soulle (tour 2)",45],["Longèves (tour 2)",51],["Nuaillé-d’Aunis (tour 2)",56],["Saint-Sauveur-d’Aunis (tour 2)",61],["Anais (tour 2)",63],["Fontpatour (tour 2)",70],["Treuil-Arnaudeau (tour 2)",74],["Montroy (retour)",76],["Dompierre-sur-Mer (retour)",79.5],["Périgny (retour)",83],["La Rochelle (retour)",86],["Arrivée",89.4]];
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const rid=()=>Math.random().toString(36).slice(2,8);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const toMin=t=>{const m=/^(\d{1,2}):(\d{2})/.exec(t||"");return m?+m[1]*60+ +m[2]:0};
+const fmt=m=>{m=((Math.round(m)%1440)+1440)%1440;return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0")};
+const fdur=m=>{m=Math.round(m);return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0")};
+const fkm=k=>String(Math.round(k*10)/10).replace(".",",");
+const col=i=>`var(--b${i%6})`;
+const SK=["nat","velo","cap"];
+const SP={velo:{n:"Vélo",rn:"Restitution vélo",c:1},nat:{n:"Natation",rn:"Restitution natation",c:2},cap:{n:"Course à pied",rn:"Restitution course",c:0}};
+const TABS=[["nat","Natation"],["nat-r","Restitution natation"],["velo","Vélo"],["velo-r","Restitution vélo"],["cap","Course à pied"],["cap-r","Restitution course"],["global","Restitution globale"]];
+const ALIAS={points:"velo",velos:"velo",gpx:"velo",restitution:"velo-r"};
+let routes=[],cur=null,tab="global",sel={},T={},timer=null,dirty=false;
+const S=k=>cur.sports[k];
+/* Allures : vélo en km/h ; natation en secondes/100 m ; course en secondes/km (distances stockées en km) */
+const fpace=s=>{s=Math.round(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+const ppace=t=>{t=String(t).trim().replace(",",".");const m=/^(\d+):(\d{1,2})$/.exec(t);if(m)return +m[1]*60+ +m[2];const v=parseFloat(t);return v>0?Math.round(v*60):0};
+const rate=(k,g)=>k==="velo"?g.speed:g.pace;
+const tAt=(k,g,km)=>{const s=toMin(g.start);if(k==="velo")return s+(g.speed>0?km/g.speed*60:0);return s+(k==="nat"?km*10:km)*g.pace/60};
+const kmAt=(k,g,t)=>{const m=t-toMin(g.start);if(m<=0)return 0;if(k==="velo")return m/60*g.speed;return g.pace>0?m*60/g.pace/(k==="nat"?10:1):0};
+const dur=(k,g)=>rate(k,g)>0?fdur(tAt(k,g,S(k).km)-toMin(g.start)):"–";
+const dnum=(k,km)=>k==="nat"?Math.round(km*1000):Math.round(km*10)/10;
+const fd=(k,km)=>k==="nat"?Math.round(km*1000)+" m":fkm(km)+" km";
+const sortedPts=k=>S(k).points.slice().sort((a,b)=>a.km-b.km);
+
+/* ---------- API ---------- */
+async function api(method,path,body,retry=true){
+  const h={"content-type":"application/json"};let c="";try{c=localStorage.getItem("edit-code")||""}catch(e){}
+  if(c)h["x-edit-code"]=c;
+  const r=await fetch("/api"+path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  if(r.status===401&&retry){const n=prompt("Code de modification :");if(n){try{localStorage.setItem("edit-code",n)}catch(e){}return api(method,path,body,false)}}
+  if(!r.ok)throw new Error(r.status);
+  return r.json();
+}
+function status(s,t){const e=$("#status");e.className=s;e.textContent=t}
+function touch(){dirty=true;status("","Enregistrement…");clearTimeout(timer);timer=setTimeout(flush,700)}
+async function flush(){
+  clearTimeout(timer);timer=null;if(!dirty||!cur)return;
+  const c=cur;dirty=false;
+  try{await api("PUT","/routes/"+c.id,{name:c.name,sports:Object.fromEntries(SK.map(k=>[k,{points:c.sports[k].points,bikes:c.sports[k].bikes,km:c.sports[k].km}]))});status("ok","Enregistré")}
+  catch(e){dirty=true;status("err","Échec de l’enregistrement. Modifie une valeur pour réessayer.")}
+}
+addEventListener("beforeunload",e=>{if(dirty){e.preventDefault();e.returnValue=""}});
+
+/* ---------- GPX ---------- */
+function parseGpx(txt){
+  const d=new DOMParser().parseFromString(txt,"application/xml");
+  let n=[...d.getElementsByTagName("trkpt")];if(!n.length)n=[...d.getElementsByTagName("rtept")];
+  const p=n.map(e=>[+e.getAttribute("lat"),+e.getAttribute("lon")]).filter(q=>isFinite(q[0])&&isFinite(q[1]));
+  if(p.length<2)throw new Error("Aucun point de trace trouvé dans ce fichier.");
+  const hv=(a,b)=>{const t=Math.PI/180,x=Math.sin((b[0]-a[0])*t/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin((b[1]-a[1])*t/2)**2;return 12742.0176*Math.asin(Math.sqrt(x))};
+  const r4=v=>Math.round(v*1e4)/1e4,r2=v=>Math.round(v*100)/100;
+  let km=0,last=0;const out=[[r4(p[0][0]),r4(p[0][1]),0]];
+  for(let i=1;i<p.length;i++){km+=hv(p[i-1],p[i]);if(km-last>=.45){out.push([r4(p[i][0]),r4(p[i][1]),r2(km)]);last=km}}
+  const e=p[p.length-1];if(out[out.length-1][2]!==r2(km))out.push([r4(e[0]),r4(e[1]),r2(km)]);
+  return out;
+}
+
+/* ---------- Création / sélection / suppression ---------- */
+async function create(name,track,pts,gpx,gpxName){
+  const v={};
+  if(track){const km=track[track.length-1][2];v.track=track;v.points=(pts||[["Départ",0],["Arrivée",Math.round(km*10)/10]]).map(([n,k])=>({id:rid(),name:n,km:k}));if(gpx){v.gpx=gpx;v.gpxName=gpxName}}
+  const r=await api("POST","/routes",{name,sports:{velo:v}});
+  location.hash="#"+r.id+"/velo";
+}
+$("#ncreate").onclick=async()=>{
+  const m=$("#nmsg"),f=$("#nfile").files[0];m.textContent="";
+  try{
+    const nm=$("#nname").value.trim()||(f?f.name.replace(/\.gpx$/i,""):"Nouveau parcours");
+    if(f){if(f.size>3500000)throw new Error("Le fichier GPX doit faire moins de 3,5 Mo sur Vercel.");const txt=await f.text();await create(nm,parseGpx(txt),null,txt,f.name)}else await create(nm,null)
+  }catch(e){m.textContent=e.message&&isNaN(e.message)?e.message:"Création impossible. Réessaie."}
+};
+$("#nexample").onclick=async()=>{try{await create("Format L 2027, option 1",EX_TRACK,EX_PTS)}catch(e){$("#nmsg").textContent="Création impossible. Réessaie."}};
+$("#newbtn").onclick=()=>{location.hash="#nouveau"};
+$("#rsel").onchange=e=>{location.hash="#"+e.target.value+"/"+tab};
+$("#rname").oninput=e=>{if(!cur)return;cur.name=e.target.value;$("#hname").textContent=cur.name||"Horaires de passage";const o=$("#rsel").selectedOptions[0];if(o)o.textContent=cur.name||"Sans nom";touch()};
+$("#delbtn").onclick=async()=>{
+  if(!cur||!confirm("Supprimer le parcours « "+cur.name+" » et toutes ses données ?"))return;
+  try{await api("DELETE","/routes/"+cur.id);cur=null;dirty=false;location.hash="";await show()}catch(e){status("err","Suppression impossible.")}
+};
+
+/* ---------- Gabarits des sections de chaque discipline ---------- */
+const seg=k=>`<div class="seg" data-seg="${k}"><a data-sub="p">Paramétrage</a><a data-sub="r">Restitution</a></div>`;
+const paramHTML=k=>`<section id="${k}" hidden>
+  ${seg(k)}
+  <h2>${SP[k].n}</h2>
+  <p class="hint">${k==="velo"?"Chaque groupe a une heure de départ et une vitesse moyenne constante.":"Chaque groupe a une heure de départ et une allure constante, saisie en minutes:secondes (ex. "+(k==="nat"?"1:45 pour 1 min 45 s aux 100 m":"5:30 pour 5 min 30 s au km")+")."}${k==="velo"?" T1 est la durée de la transition natation → vélo, en minutes.":k==="cap"?" T2 est la durée de la transition vélo → course, en minutes.":""}</p>
+  <h3 style="margin-top:0">Groupes</h3>
+  <div class="card scroll"><table><thead><tr><th>Nom</th><th>Départ</th><th class="n">${k==="velo"?"Vitesse (km/h)":"Allure (min/"+(k==="nat"?"100 m":"km")+")"}</th>${k==="nat"?"":`<th class="n">${k==="velo"?"T1":"T2"} (min)</th>`}<th class="n">Durée</th><th></th></tr></thead><tbody id="${k}-bk"></tbody></table></div>
+  <div class="bar"><button class="primary" data-add="bk">Ajouter un groupe</button></div>
+  <h3>Points de passage</h3>
+  <p class="hint">${k==="nat"?"Distance en mètres depuis le départ (ex. bouées, sortie de l’eau).":"Distance en km depuis le départ, à l’entrée dans le village ou le lieu."} La liste se trie par distance.</p>
+  <div class="card scroll"><table><thead><tr><th>Lieu</th><th class="n">${k==="nat"?"Mètres":"Km"}</th><th></th></tr></thead><tbody id="${k}-pt"></tbody></table></div>
+  <div class="bar"><button class="primary" data-add="pt">Ajouter un point</button></div>
+  <h3>Distance et fichier GPX</h3>
+  <div class="card form" style="max-width:560px">
+    <div id="${k}-gi"></div><div class="hint" id="${k}-gn" style="margin:0"></div>
+    <label id="${k}-dl">Distance (${k==="nat"?"mètres":"km"})<input class="num" id="${k}-dist" type="number" min="0" step="${k==="nat"?10:0.1}"></label>
+    <div><a class="btn" id="${k}-dw" href="#">Télécharger le GPX</a></div>
+    <label>Envoyer ou remplacer le GPX<input id="${k}-gf" type="file" accept=".gpx,application/gpx+xml,text/xml"></label>
+    <div class="msg" id="${k}-gm" role="status"></div>
+    <div><button id="${k}-gr">Enregistrer ce GPX</button></div>
+  </div>
+</section>`;
+const resHTML=k=>`<section id="${k}-r" hidden>
+  ${seg(k)}
+  <h2>${SP[k].rn}</h2>
+  <p class="hint">Clique sur un point${"\u0020"}du tableau${k==="nat"?"":" ou de la carte"} pour voir ses horaires. Fais glisser l’heure pour suivre les groupes sur le parcours.</p>
+  <div class="grid">
+    <div class="card"><div id="${k}-ms"></div><div class="slider"><div class="clock" id="${k}-clk"></div><input type="range" id="${k}-sl" aria-label="Heure"><div class="legend" id="${k}-lv"></div></div></div>
+    <div class="card panel" id="${k}-sel"></div>
+  </div>
+  <div id="${k}-ex"></div><div class="card scroll"><table id="${k}-tb"><thead id="${k}-rh"></thead><tbody id="${k}-rb"></tbody></table></div>
+</section>`;
+$("#sections").innerHTML=SK.map(k=>paramHTML(k)+resHTML(k)).join("");
+const MAIN=[["nat","Natation"],["velo","Vélo"],["cap","Course à pied"],["global","Restitution globale"]];
+$("#tabs").innerHTML=MAIN.map(([t,l])=>`<a data-tab="${t}">${l}</a>`).join("");
+
+/* ---------- Paramétrage : groupes, points, GPX ---------- */
+function renderBk(k){
+  $("#"+k+"-bk").innerHTML=S(k).bikes.map((b,i)=>`<tr data-id="${b.id}"><td><span class="sw" style="background:${col(i)}"></span><input class="name" style="width:calc(100% - 20px)" value="${esc(b.name)}" aria-label="Nom du groupe"></td><td><input type="time" value="${b.start}" aria-label="Heure de départ"></td><td class="n">${k==="velo"?`<input class="num" data-f="speed" type="number" min="5" max="80" step="0.5" value="${b.speed}" aria-label="Vitesse">`:`<input class="num" data-f="pace" type="text" inputmode="numeric" value="${fpace(b.pace)}" placeholder="m:ss" aria-label="Allure">`}</td>${k==="nat"?"":`<td class="n"><input class="num" data-f="t" type="number" min="0" step="0.5" value="${b.t||0}" aria-label="Transition ${k==="velo"?"T1":"T2"}"></td>`}<td class="n dur">${dur(k,b)}</td><td class="n"><button class="ghost" data-del aria-label="Supprimer ${esc(b.name)}">Supprimer</button></td></tr>`).join("");
+}
+function renderPt(k){
+  const nat=k==="nat";
+  $("#"+k+"-pt").innerHTML=sortedPts(k).map(p=>`<tr data-id="${p.id}"><td><input class="name" value="${esc(p.name)}" aria-label="Nom du lieu"></td><td class="n"><input class="num" type="number" step="${nat?10:0.1}" min="0" value="${dnum(k,p.km)}" aria-label="${nat?"Mètres":"Kilomètre"}"></td><td class="n"><button class="ghost" data-del aria-label="Supprimer ${esc(p.name)}">Supprimer</button></td></tr>`).join("");
+}
+function renderGpx(k){
+  const s=S(k),g=s.gpx,d=x=>new Date(x).toLocaleString("fr-FR",{dateStyle:"long",timeStyle:"short"});
+  $("#"+k+"-gi").innerHTML=`<div class="big"><span>Distance</span><strong>${fd(k,s.km)}</strong></div>`+(s.track?`<div class="big"><span>Points du tracé</span><strong>${s.track.length}</strong></div>`:"")+`<div class="big"><span>Fichier d’origine</span><strong>${g?esc(g.name)+" ("+Math.max(1,Math.round(g.size/1024))+" Ko)":"non enregistré"}</strong></div>`+(g?`<div class="big"><span>Enregistré le</span><strong>${d(g.updatedAt)}</strong></div>`:"");
+  $("#"+k+"-gn").textContent=!s.track?"Pas de tracé pour cette discipline : règle la distance ci-dessous. Envoie un GPX pour afficher le plan et calculer la distance automatiquement.":g?"":"Aucun fichier d’origine enregistré. Le téléchargement fournit le tracé simplifié (un point tous les 450 m environ).";
+  $("#"+k+"-dl").hidden=!!s.track;$("#"+k+"-dist").value=dnum(k,s.km);
+  const a=$("#"+k+"-dw");a.hidden=!s.track;a.href=g?`/api/routes/${cur.id}/gpx?sport=${k}`:"#";
+}
+function renderParam(k){renderBk(k);renderPt(k);renderGpx(k)}
+SK.forEach(k=>{
+  const sec=$("#"+k),bk=$("#"+k+"-bk"),pt=$("#"+k+"-pt");
+  bk.addEventListener("input",e=>{const tr=e.target.closest("tr"),b=S(k).bikes.find(x=>x.id==tr.dataset.id);if(!b)return;const f=e.target.dataset.f;
+    if(e.target.type==="time")b.start=e.target.value||"07:00";else if(f==="speed")b.speed=parseFloat(e.target.value)||0;else if(f==="pace")b.pace=ppace(e.target.value);else if(f==="t")b.t=Math.max(0,parseFloat(e.target.value)||0);else b.name=e.target.value;
+    tr.querySelector(".dur").textContent=dur(k,b);touch()});
+  bk.addEventListener("change",e=>{if(e.target.dataset.f==="pace")renderBk(k)});
+  bk.addEventListener("click",e=>{if(e.target.matches("[data-del]")){const id=e.target.closest("tr").dataset.id;S(k).bikes=S(k).bikes.filter(b=>b.id!=id);touch();renderBk(k)}});
+  pt.addEventListener("input",e=>{const p=S(k).points.find(x=>x.id==e.target.closest("tr").dataset.id);if(!p)return;
+    if(e.target.classList.contains("name"))p.name=e.target.value;else{const v=parseFloat(e.target.value)||0;p.km=Math.min(S(k).km,Math.max(0,k==="nat"?v/1000:v))}touch()});
+  pt.addEventListener("change",e=>{if(e.target.classList.contains("num"))renderPt(k)});
+  pt.addEventListener("click",e=>{if(e.target.matches("[data-del]")){const id=e.target.closest("tr").dataset.id;S(k).points=S(k).points.filter(p=>p.id!=id);touch();renderPt(k)}});
+  sec.querySelector('[data-add="bk"]').onclick=()=>{const d={velo:["07:00",28,0],nat:["07:00",0,110],cap:["10:00",0,330]}[k];S(k).bikes.push({id:rid(),name:"Groupe "+(S(k).bikes.length+1),start:d[0],speed:d[1]||28,pace:d[2]||330,t:k==="nat"?0:3});touch();renderBk(k)};
+  sec.querySelector('[data-add="pt"]').onclick=()=>{const p={id:rid(),name:"Nouveau lieu",km:Math.round(S(k).km/2*100)/100};S(k).points.push(p);touch();renderPt(k);const i=$(`#${k}-pt tr[data-id="${p.id}"] .name`);i.focus();i.select()};
+  $("#"+k+"-dist").addEventListener("input",e=>{const v=parseFloat(e.target.value);if(!(v>0)||S(k).track)return;S(k).km=k==="nat"?v/1000:v;touch()});
+  $("#"+k+"-dist").addEventListener("change",()=>renderParam(k));
+  $("#"+k+"-dw").onclick=e=>{
+    const s=S(k);if(s.gpx||!s.track)return;e.preventDefault();
+    const xml=`<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Horaires de passage" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${esc(cur.name)} – ${SP[k].n}</name><trkseg>`+s.track.map(p=>`<trkpt lat="${p[0]}" lon="${p[1]}"/>`).join("")+`</trkseg></trk></gpx>`;
+    const u=URL.createObjectURL(new Blob([xml],{type:"application/gpx+xml"})),l=document.createElement("a");
+    l.href=u;l.download=(cur.name||"parcours").replace(/[^\w\-]+/g,"_")+"_"+k+".gpx";l.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+  $("#"+k+"-gr").onclick=async()=>{
+    const m=$("#"+k+"-gm"),f=$("#"+k+"-gf").files[0];m.style.color="";m.textContent="";
+    if(!f){m.textContent="Choisis un fichier GPX.";return}
+    try{
+      if(f.size>3500000)throw new Error("Le fichier GPX doit faire moins de 3,5 Mo sur Vercel.");
+      const txt=await f.text(),track=parseGpx(txt),old=S(k).km;
+      const r=await api("PUT","/routes/"+cur.id,{sports:{[k]:{track,gpx:txt,gpxName:f.name}}});
+      const s=S(k);s.track=track;s.km=r.sports[k].km;s.gpx=r.sports[k].gpx;renderParam(k);$("#"+k+"-gf").value="";
+      const mm=$("#"+k+"-gm");mm.style.color="var(--ok)";mm.textContent="GPX enregistré."+(Math.abs(s.km-old)>.05?" La distance passe de "+fd(k,old)+" à "+fd(k,s.km)+" : vérifie les points de passage.":"");
+    }catch(e){m.textContent=e.message&&isNaN(e.message)?e.message:"Envoi impossible. Réessaie."}
+  };
+  /* restitution */
+  $("#"+k+"-rb").addEventListener("click",e=>{const r=e.target.closest("tr.pt");if(r)pick(k,r.dataset.id)});
+  $("#"+k+"-rb").addEventListener("keydown",e=>{if(e.key==="Enter"){const r=e.target.closest("tr.pt");if(r)pick(k,r.dataset.id)}});
+  $("#"+k+"-sl").addEventListener("input",e=>{T[k]=+e.target.value;if(S(k).track)drawBikes(k);liveInfo(k)});
+});
+
+/* ---------- Carte (Leaflet) : un seul plan, déplacé dans la restitution active ---------- */
+let map=null,mapEl=null,lines=null,ptsL=null,bikesL=null,mapTrack=null,fitted=false;
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function posAt(k,km){const s=S(k),R=s.track;km=Math.min(s.km,Math.max(0,km));let i=1;while(i<R.length-1&&R[i][2]<km)i++;
+  const k0=R[i-1][2],k1=R[i][2],f=k1>k0?(km-k0)/(k1-k0):0;return[R[i-1][0]+(R[i][0]-R[i-1][0])*f,R[i-1][1]+(R[i][1]-R[i-1][1])*f]}
+function ensureMap(k){
+  const s=S(k),ms=$("#"+k+"-ms");
+  if(!mapEl){mapEl=document.createElement("div");mapEl.id="map";mapEl.setAttribute("role","region");mapEl.setAttribute("aria-label","Plan du parcours")}
+  if(mapEl.parentNode!==ms)ms.appendChild(mapEl);
+  if(!map){
+    map=L.map(mapEl,{scrollWheelZoom:false});
+    const ign=(layer,fmt)=>L.tileLayer("https://data.geopf.fr/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&FORMAT="+fmt+"&LAYER="+layer+"&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",{maxZoom:19,attribution:"© IGN"});
+    const base={"OpenStreetMap":L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>"}),
+      "Plan IGN":ign("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2","image/png"),"Photo aérienne IGN":ign("ORTHOIMAGERY.ORTHOPHOTOS","image/jpeg"),"Tracé seul":L.layerGroup()};
+    let b="OpenStreetMap";try{const v=localStorage.getItem("basemap");if(v&&base[v])b=v}catch(e){}
+    base[b].addTo(map);L.control.layers(base,null,{collapsed:true}).addTo(map);
+    map.on("baselayerchange",e=>{try{localStorage.setItem("basemap",e.name)}catch(x){}});
+    lines=L.layerGroup().addTo(map);ptsL=L.layerGroup().addTo(map);bikesL=L.layerGroup().addTo(map);
+  }
+  map.invalidateSize();
+  if(mapTrack!==s.track){lines.clearLayers();fitted=false;mapTrack=s.track}
+  const ll=s.track.map(p=>[p[0],p[1]]);
+  if(!lines.getLayers().length){
+    L.polyline(ll,{color:"#fff",weight:9,opacity:.85,lineCap:"round",lineJoin:"round",interactive:false}).addTo(lines);
+    L.polyline(ll,{color:"#0E5A6B",weight:5,opacity:.95,lineCap:"round",lineJoin:"round",interactive:false}).addTo(lines);
+  }
+  if(!fitted){map.fitBounds(L.latLngBounds(ll),{padding:[24,24]});fitted=true}
+}
+function drawPts(k){
+  ptsL.clearLayers();const ink=css("--ink"),sf=css("--surface");
+  sortedPts(k).forEach(p=>{const on=p.id===sel[k];
+    const m=L.circleMarker(posAt(k,p.km),{radius:on?9:6,color:ink,weight:2,fillColor:on?ink:sf,fillOpacity:1}).addTo(ptsL);
+    m.bindTooltip(esc(p.name)+" · "+fd(k,p.km),{direction:"top",offset:[0,-6],permanent:on});
+    m.on("click",()=>{const here=sortedPts(k).filter(q=>map.distance(posAt(k,q.km),posAt(k,p.km))<150),i=here.findIndex(q=>q.id===sel[k]);pick(k,here[(i+1)%here.length].id)});
+  });
+}
+function drawBikes(k){
+  bikesL.clearLayers();
+  S(k).bikes.forEach((b,i)=>{const km=kmAt(k,b,T[k]);if(km<=0||km>=S(k).km)return;
+    L.circleMarker(posAt(k,km),{radius:9,color:"#fff",weight:3,fillColor:css("--b"+(i%6)),fillOpacity:1,interactive:false}).addTo(bikesL)});
+}
+
+/* ---------- Restitution d'une discipline ---------- */
+function liveInfo(k){
+  $("#"+k+"-clk").textContent=fmt(T[k]);
+  $("#"+k+"-lv").innerHTML=S(k).bikes.map((b,i)=>{const km=kmAt(k,b,T[k]),s=km<=0?"au départ":km>=S(k).km?"arrivé":fd(k,km);
+    return`<span><span class="sw" style="background:${col(i)}"></span>${esc(b.name)} : ${s}</span>`}).join("");
+}
+function renderSel(k){
+  const p=sortedPts(k).find(x=>x.id===sel[k]);
+  $("#"+k+"-sel").innerHTML=!p?`<h3 style="margin-top:0">Aucun point choisi</h3><p class="hint">Choisis un point dans le tableau${S(k).track?" ou sur la carte":""} pour voir l’heure de passage de chaque groupe.</p>`:
+   `<h3 style="margin:0 0 2px">${esc(p.name)}</h3><p class="hint" style="margin-bottom:10px">${fd(k,p.km)} sur ${fd(k,S(k).km)}</p>`+S(k).bikes.map((b,i)=>`<div class="big"><span><span class="sw" style="background:${col(i)}"></span>${esc(b.name)}</span><strong>${fmt(tAt(k,b,p.km))}</strong></div>`).join("");
+}
+function renderRes(k){
+  const s=S(k),B=s.bikes,pts=sortedPts(k);
+  $("#"+k+"-rh").innerHTML=`<tr><th>Lieu</th><th class="n">${k==="nat"?"Mètres":"Km"}</th>${B.map((b,i)=>`<th class="n"><span class="sw" style="background:${col(i)}"></span>${esc(b.name)}</th>`).join("")}</tr>`;
+  $("#"+k+"-rb").innerHTML=pts.map(p=>`<tr class="pt${p.id===sel[k]?" sel":""}" data-id="${p.id}" tabindex="0"><td>${esc(p.name)}</td><td class="n">${dnum(k,p.km)}</td>${B.map(b=>`<td class="n">${fmt(tAt(k,b,p.km))}</td>`).join("")}</tr>`).join("")+
+   `<tr class="tot"><td>Durée du parcours</td><td class="n">${dnum(k,s.km)}</td>${B.map(b=>`<td class="n">${dur(k,b)}</td>`).join("")}</tr>`;
+  const st=B.map(b=>toMin(b.start)),en=B.map(b=>rate(k,b)>0?tAt(k,b,s.km):toMin(b.start));
+  const lo=B.length?Math.min(...st):420,hi=B.length?Math.ceil(Math.max(...en)):600,sl=$("#"+k+"-sl");
+  sl.min=lo;sl.max=Math.max(hi,lo+1);sl.step=1;if(T[k]==null||T[k]<lo||T[k]>hi)T[k]=lo;sl.value=T[k];
+  $("#"+k+"-ms").hidden=!s.track;
+  if(s.track){ensureMap(k);drawPts(k);drawBikes(k)}
+  $("#"+k+"-ex").innerHTML=exp(k+"-tb",SP[k].rn+" – "+cur.name);
+  liveInfo(k);renderSel(k);
+}
+function pick(k,id){sel[k]=id;renderRes(k);const p=S(k).points.find(x=>x.id===id);if(p&&S(k).track&&map){const ll=posAt(k,p.km);if(!map.getBounds().contains(ll))map.panTo(ll)}}
+
+/* ---------- Restitution globale ---------- */
+let gm="disc";
+const slug=t=>t.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const exp=(id,t,x=true)=>`<div class="exp"><span>Exporter :</span>${x?`<button data-ex="xlsx" data-id="${id}" data-title="${esc(t)}">Tableur (.xlsx)</button>`:""}<button data-ex="png" data-id="${id}" data-title="${esc(t)}">Image (.png)</button></div>`;
+function renderGlobal(){
+  const n=Math.max(...SK.map(k=>S(k).bikes.length),0),nm=i=>{for(const k of SK){const g=S(k).bikes[i];if(g)return g.name}return"Groupe "+(i+1)};
+  const I=[...Array(n).keys()],dm=(k,g)=>tAt(k,g,S(k).km)-toMin(g.start);
+  const pairs=(gm==="disc"?SK.flatMap(k=>I.map(i=>[k,i])):I.flatMap(i=>SK.map(k=>[k,i]))).filter(([k,i])=>S(k).bikes[i]);
+  const rows=pairs.map(([k,i])=>{const g=S(k).bikes[i],a=toMin(g.start);return{k,i,g,a,b:rate(k,g)>0?tAt(k,g,S(k).km):a}});
+  const head=`<h2>Restitution globale</h2><p class="hint">Les trois disciplines, dans l’ordre natation, vélo, course à pied. Les groupes sont rapprochés d’une discipline à l’autre par leur rang dans la liste.</p>`;
+  if(!rows.length){$("#global").innerHTML=head+`<p class="hint">Aucun groupe n’est défini.</p>`;return}
+  const lo=Math.floor(Math.min(...rows.map(r=>r.a))/30)*30,hi=Math.max(lo+30,Math.ceil(Math.max(...rows.map(r=>r.b))/30)*30),W=900,LM=200,RM=130,RH=26,TOP=30,H=TOP+rows.length*RH+10,x=m=>LM+(m-lo)/(hi-lo)*(W-LM-RM),step=(hi-lo)>360?60:30;
+  let g="";
+  for(let m=lo;m<=hi;m+=step)g+=`<line x1="${x(m)}" x2="${x(m)}" y1="${TOP-6}" y2="${H-6}" style="stroke:var(--line)"/><text class="ax" x="${x(m)}" y="${TOP-12}" text-anchor="middle">${fmt(m)}</text>`;
+  rows.forEach((r,j)=>{const y=TOP+j*RH,lb=gm==="disc"?SP[r.k].n+" · "+r.g.name:r.g.name+" · "+SP[r.k].n;
+    g+=`<text x="${LM-8}" y="${y+16}" text-anchor="end">${esc(lb)}</text><rect x="${x(r.a)}" y="${y+3}" width="${Math.max(3,x(r.b)-x(r.a))}" height="${RH-8}" rx="4" style="fill:var(--${r.k})"/><text x="${x(r.b)+6}" y="${y+16}">${fmt(r.a)} → ${fmt(r.b)}</text>`});
+  const dot=k=>`<span class="dot" style="background:var(--${k})"></span>${SP[k].n}`,line=r=>`<td class="n">${fd(r.k,S(r.k).km)}</td><td class="n">${fmt(r.a)}</td><td class="n">${fmt(r.b)}</td><td class="n">${dur(r.k,r.g)}</td>`;
+  const t1=i=>(S("velo").bikes[i]||{}).t||0,t2=i=>(S("cap").bikes[i]||{}).t||0;
+  const tot=i=>SK.reduce((a,k)=>a+(S(k).bikes[i]?dm(k,S(k).bikes[i]):0),0)+(S("velo").bikes[i]?t1(i):0)+(S("cap").bikes[i]?t2(i):0);
+  let body;
+  if(gm==="disc")body=rows.map(r=>`<tr><td>${dot(r.k)}</td><td>${esc(r.g.name)}</td>${line(r)}</tr>`).join("");
+  else{
+    const tr=(i,l,v)=>`<tr><td>${esc(nm(i))}</td><td>${l}</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">${fdur(v)}</td></tr>`;
+    body=I.map(i=>{const R=k=>{const r=rows.find(q=>q.k===k&&q.i===i);return r?`<tr><td>${esc(nm(i))}</td><td>${dot(k)}</td>${line(r)}</tr>`:""};
+      return R("nat")+(S("velo").bikes[i]?tr(i,"Transition T1",t1(i)):"")+R("velo")+(S("cap").bikes[i]?tr(i,"Transition T2",t2(i)):"")+R("cap")+tr(i,"Total combiné",tot(i)).replace("<tr>",'<tr class="tot">')}).join("");
+  }
+  const cell=(k,i)=>S(k).bikes[i]?fdur(dm(k,S(k).bikes[i])):"–",tc=(k,i,f)=>S(k).bikes[i]?fdur(f(i)):"–";
+  const totals=I.map(i=>`<tr><td>${esc(nm(i))}</td><td class="n">${cell("nat",i)}</td><td class="n">${tc("velo",i,t1)}</td><td class="n">${cell("velo",i)}</td><td class="n">${tc("cap",i,t2)}</td><td class="n">${cell("cap",i)}</td><td class="n"><b>${fdur(tot(i))}</b></td></tr>`).join("");
+  const ttl=cur.name+" – Restitution globale "+(gm==="disc"?"par discipline":"par groupe");
+  $("#global").innerHTML=head+`<div class="seg" role="group" aria-label="Regroupement"><button data-g="disc" aria-pressed="${gm==="disc"}">Par discipline</button><button data-g="grp" aria-pressed="${gm==="grp"}">Par groupe</button></div>
+  ${exp("gantt",ttl+" (chronologie)",false)}<div class="card scroll" style="padding:12px"><svg id="gantt" viewBox="0 0 ${W} ${H}" style="min-width:640px;display:block;width:100%" role="img" aria-label="Chronologie des groupes">${g}</svg></div>
+  <h3>Détail</h3>${exp("t-detail",ttl)}<div class="card scroll"><table id="t-detail"><thead><tr><th>${gm==="disc"?"Discipline":"Groupe"}</th><th>${gm==="disc"?"Groupe":"Discipline"}</th><th class="n">Distance</th><th class="n">Départ</th><th class="n">Arrivée</th><th class="n">Durée</th></tr></thead><tbody>${body}</tbody></table></div>
+  <h3>Total des trois disciplines par groupe</h3><p class="hint">Somme des durées de nage, de vélo et de course, avec les transitions T1 (natation → vélo) et T2 (vélo → course).</p>${exp("t-total",cur.name+" – Total combiné par groupe")}<div class="card scroll"><table id="t-total"><thead><tr><th>Groupe</th><th class="n">Natation</th><th class="n">T1</th><th class="n">Vélo</th><th class="n">T2</th><th class="n">Course à pied</th><th class="n">Total combiné</th></tr></thead><tbody>${totals}</tbody></table></div>`;
+}
+/* ---------- Exports : tableur (.xlsx) et image (.png) ---------- */
+function saveFile(name,data,type){const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}
+const cells=t=>[...t.rows].map(r=>[...r.cells].map(c=>c.innerText.trim()));
+function xlsxBlob(t,title){const rows=cells(t),ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=rows[0].map((_,j)=>({wch:Math.min(34,Math.max(...rows.map(r=>(r[j]||"").length))+2)}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,title.slice(-31).replace(/[\\\/?*\[\]:]/g," "));return new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
+const csvBlob=t=>new Blob(["\ufeff"+cells(t).map(r=>r.map(v=>'"'+v.replace(/"/g,'""')+'"').join(";")).join("\r\n")],{type:"text/csv"});
+function tablePng(t,title){
+  const rows=[...t.rows].map(r=>[...r.cells].map(c=>({t:c.innerText.trim(),n:c.classList.contains("n"),b:r.classList.contains("tot")||r.parentNode.tagName==="THEAD"})));
+  const F=b=>(b?"700 ":"400 ")+"16px 'Barlow Semi Condensed',Arial,sans-serif",c=document.createElement("canvas"),x=c.getContext("2d"),pad=12,rh=32,top=44;
+  const cw=rows[0].map((_,j)=>Math.max(...rows.map(r=>{x.font=F(r[j]&&r[j].b);return x.measureText(r[j]?r[j].t:"").width}))+2*pad);
+  x.font="800 22px 'Barlow Condensed',Arial,sans-serif";
+  const W=Math.ceil(Math.max(cw.reduce((a,b)=>a+b,0),x.measureText(title.toUpperCase()).width+2*pad)),H=top+rh*rows.length+8,S2=2;
+  c.width=W*S2;c.height=H*S2;x.scale(S2,S2);x.fillStyle="#fff";x.fillRect(0,0,W,H);
+  x.fillStyle="#0B2545";x.font="800 22px 'Barlow Condensed',Arial,sans-serif";x.textAlign="left";x.fillText(title.toUpperCase(),pad,30);
+  rows.forEach((r,i)=>{const y=top+i*rh,head=t.rows[i].parentNode.tagName==="THEAD";
+    if(head){x.fillStyle="#0B2545";x.fillRect(0,y,cw.reduce((a,b)=>a+b,0),rh)}else if(i%2===0){x.fillStyle="#F2F6FA";x.fillRect(0,y,cw.reduce((a,b)=>a+b,0),rh)}
+    let px=0;r.forEach((cell,j)=>{x.font=F(cell.b);x.fillStyle=head?"#fff":"#0B2545";x.textAlign=cell.n?"right":"left";x.fillText(cell.t,cell.n?px+cw[j]-pad:px+pad,y+21);px+=cw[j]});
+    x.strokeStyle="#D2DDE6";x.beginPath();x.moveTo(0,y+rh);x.lineTo(cw.reduce((a,b)=>a+b,0),y+rh);x.stroke()});
+  return new Promise((ok,ko)=>c.toBlob(b=>b?ok(b):ko(new Error("png")),"image/png"));
+}
+function svgPng(svg,title){return new Promise((ok,ko)=>{
+  const cs=getComputedStyle(document.documentElement),v=n=>cs.getPropertyValue(n).trim(),vb=svg.viewBox.baseVal,W=vb.width,H=vb.height;
+  let s=new XMLSerializer().serializeToString(svg).replace(/var\((--[\w-]+)\)/g,(m,n)=>v(n)).replace(/ style="min-width[^"]*"/,"").replace("<svg",`<svg width="${W}" height="${H}"`);
+  s=s.replace(/>/,`><style>text{font:13px Arial,sans-serif;fill:${v("--ink")}}.ax{fill:${v("--muted")}}</style><rect width="100%" height="100%" fill="${v("--surface")}"/>`);
+  const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=W*2;c.height=H*2;const x=c.getContext("2d");x.scale(2,2);x.drawImage(img,0,0,W,H);c.toBlob(b=>b?ok(b):ko(new Error("png")),"image/png")};
+  img.onerror=()=>ko(new Error("img"));img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s)})}
+document.addEventListener("click",async e=>{
+  const g=e.target.closest("[data-g]");if(g){gm=g.dataset.g;renderGlobal();return}
+  const b=e.target.closest("[data-ex]");if(!b)return;
+  const el=document.getElementById(b.dataset.id),title=b.dataset.title,name=slug(title);
+  try{
+    if(b.dataset.ex==="xlsx"){if(window.XLSX)saveFile(name+".xlsx",xlsxBlob(el,title));else saveFile(name+".csv",csvBlob(el))}
+    else saveFile(name+".png",await(el.tagName.toLowerCase()==="svg"?svgPng(el,title):tablePng(el,title)));
+  }catch(err){status("err","L’export n’a pas pu être créé.")}
+});
+
+/* ---------- Navigation : #<id>/<onglet> ou #nouveau ---------- */
+async function loadList(){routes=await api("GET","/routes")}
+function fillSelect(){$("#rsel").innerHTML=routes.map(r=>`<option value="${r.id}">${esc(r.name||"Sans nom")}</option>`).join("");if(cur)$("#rsel").value=cur.id}
+async function show(){
+  if(dirty)await flush();
+  let [id,t]=location.hash.slice(1).split("/");
+  try{await loadList()}catch(e){status("err","Impossible de joindre le serveur.");return}
+  if(id==="nouveau"||!routes.length){cur=null;fillSelect();return view("nouveau")}
+  if(!routes.some(r=>r.id===id))id=routes[0].id;
+  if(!cur||cur.id!==id){
+    try{cur=await api("GET","/routes/"+id)}catch(e){status("err","Parcours introuvable.");return}
+    sel={};T={};mapTrack=null;
+  }
+  t=ALIAS[t]||t;tab=TABS.some(x=>x[0]===t)?t:"global";
+  fillSelect();$("#rname").value=cur.name;status("ok","Enregistré");
+  if(location.hash!=="#"+id+"/"+tab)history.replaceState(null,"","#"+id+"/"+tab);
+  view(tab);
+}
+function view(name){
+  const has=!!cur&&name!=="nouveau",ids=cur?cur.id:"",sub=name.endsWith("-r");
+  $$("main section").forEach(s=>s.hidden=s.id!==name);
+  $("#tabs").hidden=!has;$("#rname").hidden=!has;$("#delbtn").hidden=!has;$("#rsel").hidden=!routes.length;$("label[for=rsel]").hidden=!routes.length;
+  $("#hname").textContent=cur?cur.name||"Horaires de passage":"Horaires de passage";
+  $("#facts").hidden=!has;
+  if(has)$("#facts").innerHTML=SK.map(k=>`<div class="fact ${k}">${SP[k].n}<b>${fd(k,S(k).km)}</b></div>`).join("");
+  $$("#tabs a").forEach(a=>{const k=a.dataset.tab;a.href="#"+ids+"/"+(k!=="global"&&sub?k+"-r":k);if(name===k||name===k+"-r")a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+  $$(".seg[data-seg]").forEach(sg=>{const k=sg.dataset.seg;[["p",k],["r",k+"-r"]].forEach(([s,t])=>{const a=sg.querySelector(`[data-sub=${s}]`);a.href="#"+ids+"/"+t;if(name===t)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})});
+  if(!has)return;
+  if(SK.includes(name))renderParam(name);else if(name==="global")renderGlobal();else renderRes(name.replace(/-r$/,""));
+}
+addEventListener("hashchange",show);show();
+</script>
+</body>
+</html>

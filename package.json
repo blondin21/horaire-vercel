@@ -1,0 +1,10 @@
+{
+  "name": "horaires-velo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Horaires de passage natation, vélo et course à pied, déployable sur Vercel",
+  "type": "module",
+  "scripts": { "dev": "vercel dev" },
+  "dependencies": { "@vercel/blob": "^2.3.0" },
+  "devDependencies": { "vercel": "^50.20.0" }
+}
