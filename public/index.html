@@ -145,7 +145,7 @@ async function api(method,path,body,retry=true){
   if(c)h["x-edit-code"]=c;
   const r=await fetch("/api"+path,{method,headers:h,body:body?JSON.stringify(body):undefined});
   if(r.status===401&&retry){const n=prompt("Code de modification :");if(n){try{localStorage.setItem("edit-code",n)}catch(e){}return api(method,path,body,false)}}
-  if(!r.ok)throw new Error(r.status);
+  if(!r.ok){let message="";try{message=(await r.json()).error||""}catch(e){}throw new Error(message||`Erreur HTTP ${r.status}`)}
   return r.json();
 }
 function status(s,t){const e=$("#status");e.className=s;e.textContent=t}
@@ -429,7 +429,7 @@ function fillSelect(){$("#rsel").innerHTML=routes.map(r=>`<option value="${r.id}
 async function show(){
   if(dirty)await flush();
   let [id,t]=location.hash.slice(1).split("/");
-  try{await loadList()}catch(e){status("err",location.protocol==="file:"?"Page ouverte en local : lance l’application avec Vercel (`npm run dev`) ou déploie-la sur Vercel pour connecter l’API et le stockage.":"Impossible de joindre l’API. Vérifie le déploiement et la configuration du stockage Vercel Blob.");return}
+  try{await loadList()}catch(e){status("err",location.protocol==="file:"?"Page ouverte en local : lance l’application avec Vercel (`npm run dev`) ou déploie-la sur Vercel pour connecter l’API et le stockage.":e.message||"Impossible de joindre l’API. Vérifie le déploiement et la configuration du stockage Vercel Blob.");return}
   if(id==="nouveau"||!routes.length){cur=null;fillSelect();return view("nouveau")}
   if(!routes.some(r=>r.id===id))id=routes[0].id;
   if(!cur||cur.id!==id){
